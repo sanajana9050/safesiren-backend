@@ -3,6 +3,7 @@ const express = require('express');
 const app = express();
 const port = 3000;
 
+
 //cors
 const cors = require('cors');
 app.use(cors());
@@ -58,6 +59,7 @@ var emergencyContactNumber = "";
 var tripStatus = "not_started";
 var timer = 45; //45 seconds
 var lastLatLong = "";
+var travelerName = "";
 
 //implement crud operations for the above variables with 200 status code and json response
 app.get('/duration', (req, res) => res.json(parseInt(duration)));
@@ -71,6 +73,7 @@ app.get('/emergencyContactNumber', (req, res) => res.json(emergencyContactNumber
 app.get('/tripStatus', (req, res) => res.json(tripStatus));
 app.get('/timer', (req, res) => res.json(timer));
 app.get('/lastLatLong', (req, res) => res.json(lastLatLong));
+app.get('/travelerName', (req, res) => res.json(travelerName));
 
 
 app.post('/duration', (req, res) => {
@@ -110,6 +113,11 @@ app.post('/lastLatLong', (req, res) => {
     lastLatLong = req.query.lastLatLong;
     res.json(lastLatLong);
 });
+app.post('/travelerName', (req, res) => {
+    travelerName = req.query.travelerName;
+    res.json(travelerName);
+});
+
 
 
 
@@ -193,7 +201,31 @@ app.post('/risk', (req, res) => {
     res.json(parseInt(risk));
 });
 
+require('dotenv').config()
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
 
+
+const clientTwilio = require('twilio')(accountSid, authToken);
+
+const callEmergencyContact = async (number) => {
+    clientTwilio.calls  
+        .create({
+            twiml: `<Response><Say>
+            Hello ${emergencyContactName}, ${travelerName} is in danger while traveling.
+            They added you as an emergency contact.
+            \nDriver details: ${driverDetails}.
+            </Say></Response>`,
+            to: `+91${number}`,
+            from: '+16812068542'
+        })
+        .then(call => console.log(call.sid));
+}
+
+app.get('/callEmergencyContact', (req, res) => {
+    callEmergencyContact("7014748022");
+    res.send("called");
+});
 
 
 //start express app
@@ -227,6 +259,7 @@ const initiateEmergency = async () => {
     const message = `Hello ${emergencyContactName}, I'm in danger. \nDriver details: ${driverDetails}.
     \nLast location: https://www.google.com/maps?q=${lastLatLong}`;
     try {
+        callEmergencyContact(emergencyContactNumber);
         await sendMessage(emergencyContactNumber, message);
     }
     catch(error) {
@@ -235,4 +268,5 @@ const initiateEmergency = async () => {
     //send notification
     
 }
+
 
