@@ -24,6 +24,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 app.get('/', (req, res) => res.send('Hello World!'));
 
+
+
 var duration = 0;
 var distance = 0;
 var origin = "";
@@ -62,10 +64,7 @@ app.post('/destination', (req, res) => {
     destination = req.query.destination;
     res.json(destination);
 });
-app.post('/risk', (req, res) => {
-    risk = req.query.risk;
-    res.json(parseInt(risk));
-});
+
 app.post('/driverDetails', (req, res) => {
     driverDetails = req.query.driverDetails;
     res.json(driverDetails);
@@ -85,7 +84,87 @@ app.post('/tripStatus', (req, res) => {
 
 
 
+
+//reset all variables
+app.get('/reset', (req, res) => {
+    duration = 0;
+    distance = 0;
+    origin = "";
+    destination = "";
+    risk = 0;
+    driverDetails = "";
+    emergencyContactName = "";
+    emergencyContactNumber = "";
+    tripStatus = "not_started";
+    res.send("reset");
+});
+
+
+const { Expo } = require('expo-server-sdk');
+
+const expo = new Expo();
+
+// An array of the client's Expo push tokens
+const pushTokens = ['ExponentPushToken[QTnrYWLRenu6hTE7_TbLkj]'];
+const path = require('path');
+
+// Construct the path to the sound file
+const soundFile = path.join(__dirname, 'assets', 'sos.aiff');
+// Create the notification message with custom vibration and sound
+const message = {
+    to: pushTokens,
+    sound: 'default',
+    title: 'SOS',
+    body: 'Your safety is at risk!',
+    ios: {
+      sound: soundFile,
+      _displayInForeground: true,
+      _category: 'SOS',
+      _alertType: 'critical',
+      _vibrationPattern: [500, 1000, 500, 1000, 500, 1000],
+    },
+    android: {
+      channelId: 'default',
+      sound: 'default',
+      priority: 'max',
+      vibrate: [500, 1000, 500, 1000, 500, 1000],
+      color: '#FF0000',
+    },
+  };
+
+// Send the message
+const sendNotification = async () => {
+  try {
+    const response = await expo.sendPushNotificationsAsync([message]);
+    console.log(response);
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+//send notification endpoint
+app.get('/sendNotification', (req, res) => {
+    //send notification 5 times with 2 seconds interval
+    for (var i = 0; i < 5; i++) {
+        setTimeout(sendNotification, 3000 * i);
+    }
+
+    res.send("notification sent");
+});
+
+app.post('/risk', (req, res) => {
+    risk = req.query.risk;
+    if(parseInt(risk) > 70) {
+        for (var i = 0; i < 5; i++) {
+            setTimeout(sendNotification, 3000 * i);
+        }
+    }
+    res.json(parseInt(risk));
+});
+
+
+
+
+
 //start express app
 app.listen(port, () => console.log(`Example app listening on port ${port}!`));
-
-
