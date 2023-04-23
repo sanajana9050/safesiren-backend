@@ -60,6 +60,7 @@ var tripStatus = "not_started";
 var timer = 45; //45 seconds
 var lastLatLong = "";
 var travelerName = "";
+var falseAlarmCount = 0;
 
 //implement crud operations for the above variables with 200 status code and json response
 app.get('/duration', (req, res) => res.json(parseInt(duration)));
@@ -74,6 +75,8 @@ app.get('/tripStatus', (req, res) => res.json(tripStatus));
 app.get('/timer', (req, res) => res.json(timer));
 app.get('/lastLatLong', (req, res) => res.json(lastLatLong));
 app.get('/travelerName', (req, res) => res.json(travelerName));
+app.get('/falseAlarmCount', (req, res) => res.json(parseInt(falseAlarmCount)));
+
 
 
 app.post('/duration', (req, res) => {
@@ -116,6 +119,10 @@ app.post('/lastLatLong', (req, res) => {
 app.post('/travelerName', (req, res) => {
     travelerName = req.query.travelerName;
     res.json(travelerName);
+});
+app.post('/falseAlarmCount', (req, res) => {
+    falseAlarmCount = req.query.falseAlarmCount;
+    res.json(parseInt(falseAlarmCount));
 });
 
 
@@ -208,23 +215,24 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 
 const clientTwilio = require('twilio')(accountSid, authToken);
 
-const callEmergencyContact = async (number) => {
-    clientTwilio.calls  
-        .create({
-            twiml: `<Response><Say>
-            Hello ${emergencyContactName}, ${travelerName} is in danger while traveling.
-            They added you as an emergency contact.
-            \nDriver details: ${driverDetails}.
-            </Say></Response>`,
-            to: `+91${number}`,
-            from: '+16812068542'
-        })
-        .then(call => console.log(call.sid));
-}
+
 
 app.get('/callEmergencyContact', (req, res) => {
     callEmergencyContact("7014748022");
     res.send("called");
+});
+
+app.get('/triggerSafe', (req, res) => {
+    falseAlarmCount++;
+    if(timer == 0 ){
+        //false alarm
+        stopEmergencyService();
+        falseAlarmSequence();
+    }
+    else{
+        stopEmergencyService();
+    }
+    res.send("safe");
 });
 
 
@@ -254,12 +262,20 @@ const stopEmergencyService = async () => {
 }
 
 const initiateEmergency = async () => {
-
+    clearInterval(timerInterval);
+    timer = 0;
     //send whatsapp message
     const message = `Hello ${emergencyContactName}, I'm in danger. \nDriver details: ${driverDetails}.
     \nLast location: https://www.google.com/maps?q=${lastLatLong}`;
     try {
-        callEmergencyContact(emergencyContactNumber);
+
+        const callMessage = `<Response><Say>
+        Hello ${emergencyContactName}, ${travelerName} is in danger while traveling.
+        They added you as an emergency contact.
+        \nDriver details: ${driverDetails}.
+        </Say></Response>`
+
+        callEmergencyContact(emergencyContactNumber, callMessage);
         await sendMessage(emergencyContactNumber, message);
     }
     catch(error) {
@@ -269,4 +285,31 @@ const initiateEmergency = async () => {
     
 }
 
+const falseAlarmSequence = async () => {    
+    //send notification
+    //send whatsapp message
+    const message = `Hello ${emergencyContactName}, the above message was a false alarm. I apologize for the inconvenience.`;
+    try {
+        const callMessage = `<Response><Say>
+        Hello ${emergencyContactName}, the previous call regarding the emergency was a false alarm. I apologize for the inconvenience.
+        </Say></Response>`
 
+        callEmergencyContact(emergencyContactNumber, callMessage);
+        await sendMessage(emergencyContactNumber, message);
+
+    }
+    catch(error) {
+        console.log(error);
+    }
+
+}
+
+const callEmergencyContact = async (number, message) => {
+    clientTwilio.calls  
+        .create({
+            twiml: message,
+            to: `+91${number}`,
+            from: '+16812068542'
+        })
+        .then(call => console.log(call.sid));
+}
