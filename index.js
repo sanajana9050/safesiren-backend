@@ -20,6 +20,26 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 
+//init whatsapp client
+const qrcode = require('qrcode-terminal');
+
+const { Client } = require('whatsapp-web.js');
+const client = new Client();
+
+client.on('qr', qr => {
+    qrcode.generate(qr, {small: true});
+});
+
+client.on('ready', () => {
+    console.log('Client is ready!');
+});
+
+client.initialize();
+ 
+const sendMessage = async (number, message) => {
+    const id = await client.getNumberId(number); 
+    await client.sendMessage(id._serialized,message);
+}
 
 
 app.get('/', (req, res) => res.send('Hello World!'));
@@ -36,6 +56,8 @@ var driverDetails = "";
 var emergencyContactName = "";
 var emergencyContactNumber = "";
 var tripStatus = "not_started";
+var timer = 45; //45 seconds
+var lastLatLong = "";
 
 //implement crud operations for the above variables with 200 status code and json response
 app.get('/duration', (req, res) => res.json(parseInt(duration)));
@@ -47,6 +69,9 @@ app.get('/driverDetails', (req, res) => res.json(driverDetails));
 app.get('/emergencyContactName', (req, res) => res.json(emergencyContactName));
 app.get('/emergencyContactNumber', (req, res) => res.json(emergencyContactNumber));
 app.get('/tripStatus', (req, res) => res.json(tripStatus));
+app.get('/timer', (req, res) => res.json(timer));
+app.get('/lastLatLong', (req, res) => res.json(lastLatLong));
+
 
 app.post('/duration', (req, res) => {
     duration = req.query.duration;
@@ -81,6 +106,12 @@ app.post('/tripStatus', (req, res) => {
     tripStatus = req.query.tripStatus;
     res.json(tripStatus);
 });
+app.post('/lastLatLong', (req, res) => {
+    lastLatLong = req.query.lastLatLong;
+    res.json(lastLatLong);
+});
+
+
 
 
 
@@ -96,6 +127,7 @@ app.get('/reset', (req, res) => {
     emergencyContactName = "";
     emergencyContactNumber = "";
     tripStatus = "not_started";
+    timer = 45;
     res.send("reset");
 });
 
@@ -142,10 +174,11 @@ const sendNotification = async () => {
   }
 };
 
+var timerInterval = null;
 //send notification endpoint
 app.get('/sendNotification', (req, res) => {
     //send notification 5 times with 2 seconds interval
-    for (var i = 0; i < 5; i++) {
+    for (var i = 0; i < 10; i++) {
         setTimeout(sendNotification, 3000 * i);
     }
 
@@ -154,10 +187,8 @@ app.get('/sendNotification', (req, res) => {
 
 app.post('/risk', (req, res) => {
     risk = req.query.risk;
-    if(parseInt(risk) > 70) {
-        for (var i = 0; i < 5; i++) {
-            setTimeout(sendNotification, 3000 * i);
-        }
+    if(parseInt(risk) > 70 && timerInterval == null) {
+        startEmergencyService();
     }
     res.json(parseInt(risk));
 });
@@ -165,6 +196,42 @@ app.post('/risk', (req, res) => {
 
 
 
-
 //start express app
-app.listen(port, () => console.log(`Example app listening on port ${port}!`));
+app.listen(port, () => console.log(`Backend app listening on port ${port}!`));
+
+const startEmergencyService = async () => {
+    for (var i = 0; i < 10; i++) {
+        setTimeout(sendNotification, 3000 * i);
+    }
+    //start timer for 45 seconds to 0 seconds
+    timerInterval = setInterval(() => {
+        timer--;
+        if(timer === 0) {
+            //initiate emergency
+            initiateEmergency();
+        }
+    }
+    , 1000);
+}
+
+const stopEmergencyService = async () => {
+    //stop timer
+    clearInterval(timerInterval);
+    timer = 45;
+    risk = 0;
+}
+
+const initiateEmergency = async () => {
+
+    //send whatsapp message
+    const message = `Hello ${emergencyContactName}, I'm in danger. \nDriver details: ${driverDetails}.
+    \nLast location: https://www.google.com/maps?q=${lastLatLong}`;
+    try {
+        await sendMessage(emergencyContactNumber, message);
+    }
+    catch(error) {
+        console.log(error);
+    }
+    //send notification
+    
+}
