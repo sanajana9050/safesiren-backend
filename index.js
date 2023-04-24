@@ -202,7 +202,7 @@ app.get('/sendNotification', (req, res) => {
 
 app.post('/risk', (req, res) => {
     risk = req.query.risk;
-    if(parseInt(risk) > 70 && timerInterval == null) {
+    if((parseInt(risk) - 10 * falseAlarmCount) > 70 && timerInterval == null) {
         startEmergencyService();
     }
     res.json(parseInt(risk));
